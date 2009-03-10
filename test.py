@@ -2,12 +2,12 @@
 
 import logging
 
-import pMySQL
+import mysqlp
 
 
 if '__main__' == __name__:
     logging.basicConfig(level=logging.DEBUG)
-    conn = pMySQL.connect('localhost', 'sbrsw_write', 'wonkette', 'sbrsw')
+    conn = mysqlp.connect()
     #c = conn.cursor()
     #c.close()
     conn.close()

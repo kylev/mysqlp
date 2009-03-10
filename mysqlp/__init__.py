@@ -5,9 +5,9 @@ adapted to coro.
 """
 
 import exceptions
+import hashlib
 import logging
 import math
-import sha
 import socket
 
 
@@ -103,11 +103,11 @@ def _encode_int(number, length=1):
 
 def _scramble(message, password):
     # Double SHA1 the password
-    stage_one = sha.new(password).digest()
-    stage_two = sha.new(stage_one).digest()
+    stage_one = hashlib.sha1(password).digest()
+    stage_two = hashlib.sha1(stage_one).digest()
 
     # Combine the two
-    crypt_string = sha.new(message)
+    crypt_string = hashlib.sha1(message)
     crypt_string.update(stage_two)
     to = crypt_string.digest()
 
