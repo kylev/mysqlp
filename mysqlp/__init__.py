@@ -140,7 +140,6 @@ class Connection(object):
 
     def _recv(self):
         """Call to get data when we expect it."""
-
         data = self._s.recv(DEFAULT_RECV_SIZE)
         if not data:
             raise "TODO exception"
@@ -199,31 +198,27 @@ class Connection(object):
 
     def _decode_greeting(self, greeting):
         """Extract all the info about the server from the greeting packet."""
+        # 1-byte protocol version followed by null terminated server version string
+        self._proto, rest = _extract_int(greeting)
+        self._version, rest = rest.split('\x00', 1)
 
-        self._proto, greeting = _extract_int(greeting)
-        eos = greeting.find('\x00')
-        self._version = greeting[:eos]
+        # 4-byte thread ID
+        self._thread_id, rest = _extract_int(rest, 4)
 
-        # 4 byte thread ID
-        self._thread_id, greeting = _extract_int(greeting[eos + 1:], 4)
-
-        # Another string, the salt
-        eosalt = greeting.find('\x00')
-        self._salt = greeting[:eosalt]
+        # Scramble buff, skip 1-byte filler
+        self._salt, rest = rest[:8], rest[9:]
 
         # Two bytes of capabilities
-        self._capabilities, greeting = _extract_int(greeting[eosalt + 1:], 2)
+        self._capabilities, rest = _extract_int(rest, 2)
 
         # Single charset byte
-        self._charset, greeting = _extract_int(greeting)
+        self._charset, rest = _extract_int(rest)
 
         # Two bytes of status
-        self._status, greeting = _extract_int(greeting, 2)
+        self._status, rest = _extract_int(rest, 2)
 
-        # Empty 13 bytes, then the rest of the salt
-        greeting = greeting[13:]
-        eosalt2 = greeting.find('\x00')
-        self._salt += greeting[:eosalt2]
+        # Empty 13 bytes, then 13 more bytes of the salt
+        self._salt += rest[13:]
 
         if self._log.isEnabledFor(logging.DEBUG):
             self._log.debug("Protocol v%d, version %s, thread %d, "
