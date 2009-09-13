@@ -10,8 +10,8 @@ import logging
 import math
 import socket
 
-from mysqlp import cursors
-
+from mysqlp import cursors, wire
+from mysqlp import hack
 
 apilevel = '2.0'
 threadsafety = 1
@@ -88,12 +88,7 @@ def _make_socket(*args):
 
 def _extract_int(data, length=1):
     """Extract an n-byte integer, return it and the remaining string."""
-
-    result = 0
-    for i in xrange(length):
-        result |= ord(data[i]) << (i * 8)
-
-    return result, data[length:]
+    return wire.decode_int(data, length)
 
 
 def _encode_int(number, length=1):
@@ -133,10 +128,6 @@ def _scramble(message, password):
                       for x in xrange(len(to))])
 
     return result
-
-
-def _hexify(data):
-    return ' '.join(['%02x' % (ord(x),) for x in data])
 
 
 class Connection(object):
@@ -188,7 +179,7 @@ class Connection(object):
         self._recv_buffer = self._recv_buffer[MYSQL_HEADER_SIZE + packet_len:]
         self._recv_length = self._recv_length - (MYSQL_HEADER_SIZE + packet_len)
 
-        self._log.debug("ipkt%d:%s", seq, _hexify(data))
+        self._log.debug("ipkt%d:%s", seq, hack.hexify(data))
 
         return seq, data
 
@@ -209,7 +200,7 @@ class Connection(object):
         packet = '%s%s%s' % (_encode_int(len(data), 3), _encode_int(seq),
                              data)
 
-        self._log.debug("Sending packet %s", _hexify(packet))
+        self._log.debug("Sending packet %s", hack.hexify(packet))
 
         if self._s.sendall(packet) is not None:
             raise InterfaceError("Send failed.")

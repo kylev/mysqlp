@@ -1,5 +1,9 @@
 """Cursor implementation."""
 
+from mysqlp import wire
+from mysqlp import hack
+
+
 class Cursor(object):
     """A cursor, though which most database interactions are done."""
 
@@ -26,7 +30,19 @@ class Cursor(object):
             seq, data = self._conn._read_packet()
             if data[0] == '\xfe':
                 break
-        print repr(self._data)
+            catalog, rest = wire.decode_lstr(data)
+            db, rest = wire.decode_lstr(rest)
+            table, rest = wire.decode_lstr(rest)
+            org_table, rest = wire.decode_lstr(rest)
+            name, rest = wire.decode_lstr(rest)
+            org_name, rest = wire.decode_lstr(rest)
+            # Skip filler byte
+            charset, rest = wire.decode_int(rest[1:], 2)
+            length, rest = wire.decode_int(rest, 4)
+            col_type, rest = wire.decode_int(rest)
+            flags, rest =  wire.decode_int(rest, 2)
+            decimals, rest =  wire.decode_int(rest)
+            print hack.hexify(rest[2:])
 
     def close(self):
         pass
