@@ -43,7 +43,7 @@ CAPS = dict(CLIENT_LONG_PASSWORD=1,
             )
 DEFAULT_CAPS = CAPS['CLIENT_LONG_PASSWORD'] | CAPS['CLIENT_LONG_FLAG'] \
     | CAPS['CLIENT_SECURE_CONNECTION'] | CAPS['CLIENT_TRANSACTIONS'] \
-    | CAPS['CLIENT_PROTOCOL_41']
+    | CAPS['CLIENT_PROTOCOL_41'] | CAPS['CLIENT_SECURE_CONNECTION']
 
 
 # PEP 249 required exceptions
@@ -193,7 +193,7 @@ class Connection(object):
 
         self._log.debug("Sending packet %s", _hexify(packet))
 
-        if self._s.sendall(data) is not None:
+        if self._s.sendall(packet) is not None:
             raise InterfaceError("Send failed.")
 
     def _decode_greeting(self, greeting):
@@ -244,12 +244,15 @@ class Connection(object):
         if self._db:
             capabilities |= CAPS['CLIENT_CONNECT_WITH_DB']
 
-        login_pkt = "%s%s%s%s\x00%s%s" % (_encode_int(capabilities, 4),
-                                          "\x00\x00\x00\x01\x08",
-                                          "\x00" * 23,
-                                          self._user,
-                                          _encode_int(len(enc_password)),
-                                          enc_password)
+        # TODO Make better decisions about extended capabilities
+        login_pkt = "%s%s%s%s%s\x00%s%s" % \
+            (_encode_int(capabilities & 0xffff, 2),
+             _encode_int(capabilities >> 16, 2),
+             "\x00\x00\x00\x01\x08",
+             "\x00" * 23,
+             self._user,
+             _encode_int(len(enc_password)),
+             enc_password)
 
         if self._db:
             login_pkt = "%s%s\x00" % (login_pkt, self._db)
