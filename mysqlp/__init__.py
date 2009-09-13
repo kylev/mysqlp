@@ -10,6 +10,8 @@ import logging
 import math
 import socket
 
+from mysqlp import cursors
+
 
 apilevel = '2.0'
 threadsafety = 1
@@ -186,6 +188,8 @@ class Connection(object):
         self._recv_buffer = self._recv_buffer[MYSQL_HEADER_SIZE + packet_len:]
         self._recv_length = self._recv_length - (MYSQL_HEADER_SIZE + packet_len)
 
+        self._log.debug("ipkt%d:%s", seq, _hexify(data))
+
         return seq, data
 
     def _read_reply_header(self):
@@ -198,12 +202,11 @@ class Connection(object):
         elif code == 254:
             raise InterfaceError('Unknown header <%s>' % (repr(data),))
         else:
-            print repr(data)
+            print code
+        return data
 
-    def _send_packet(self, data):
-        self._seq += 1
-
-        packet = '%s%s%s' % (_encode_int(len(data), 3), _encode_int(self._seq),
+    def _send_packet(self, data, seq=0):
+        packet = '%s%s%s' % (_encode_int(len(data), 3), _encode_int(seq),
                              data)
 
         self._log.debug("Sending packet %s", _hexify(packet))
@@ -272,9 +275,8 @@ class Connection(object):
         if self._db:
             login_pkt = '%s%s\x00' % (login_pkt, self._db)
 
-        print len(login_pkt)
-
-        self._send_packet(login_pkt)
+        # Login packet always has seqence 1 for some reason
+        self._send_packet(login_pkt, 1)
         self._read_reply_header()
 
     def close(self):
@@ -290,52 +292,13 @@ class Connection(object):
         pass
 
     def cursor(self):
-        return Cursor(self)
+        return cursors.Cursor(self)
+
+    def _cmd_query(self, query):
+        self._send_packet('\x03' + query)
 
 
 # PEP-249 Required alias
 connect = Connection
-
-
-class Cursor(object):
-    def __init__(self, connection):
-        self._connection = connection
-        self.description = None # TODO 7-tuple
-        self.rowcount = None
-        self.arraysize = 1
-
-    def __del__(self):
-        self.close()
-
-    def callproc(self, procname, params=None):
-        pass
-
-    def close(self):
-        self.connection = None
-
-    def execute(self, operation, params=None):
-        pass
-
-    def executemany(self, operation, params_seq):
-        pass
-
-    def fetchone(self):
-        pass
-
-    def fetchmany(self, qty):
-        pass
-
-    def fetchall(self):
-        pass
-
-    def nextset(self):
-        pass
-
-    def setinputsizes(self, sizes):
-        pass
-
-    def setoutputsize(self, size, column=None):
-        pass
-
 
 # TODO Define all the other constants and singletons from PEP 249
