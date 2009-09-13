@@ -101,6 +101,21 @@ def _encode_int(number, length=1):
     return result
 
 
+def _encode_len(length):
+    """Encode the length of a string to follow."""
+    if length <= 250:
+        return chr(length)
+    raise NotImplementedError("Length coding incomplete.")
+
+
+def _len_bin(data):
+    """Return a length coded binary string."""
+    if data is None:
+        # Special NULL column value
+        return chr(251)
+    return _encode_len(len(data)) + data
+
+
 def _scramble(message, password):
     # Double SHA1 the password
     stage_one = hashlib.sha1(password).digest()
@@ -236,26 +251,26 @@ class Connection(object):
         self._log.debug("Greeting %s", repr(greeting))
         self._decode_greeting(greeting)
 
-        enc_password = _scramble(self._salt, self._password)
-        #self._log.debug("Sending scramble %s length %d", repr(enc_password),
-        #                len(enc_password))
-
         capabilities = DEFAULT_CAPS
         if self._db:
             capabilities |= CAPS['CLIENT_CONNECT_WITH_DB']
 
         # TODO Make better decisions about extended capabilities
-        login_pkt = "%s%s%s%s%s\x00%s%s" % \
-            (_encode_int(capabilities & 0xffff, 2),
-             _encode_int(capabilities >> 16, 2),
-             "\x00\x00\x00\x01\x08",
-             "\x00" * 23,
-             self._user,
-             _encode_int(len(enc_password)),
-             enc_password)
+        login_pkt = "%s%s%s%s%s\x00" % (_encode_int(capabilities & 0xffff, 2),
+                                        _encode_int(capabilities >> 16, 2),
+                                        "\x00\x00\x00\x01\x08",
+                                        "\x00" * 23,
+                                        self._user,
+                                        )
+
+        if self._password:
+            enc_password = _scramble(self._salt, self._password)
+            login_pkt += _len_bin(enc_password)
+        else:
+            login_pkt += '\x00'
 
         if self._db:
-            login_pkt = "%s%s\x00" % (login_pkt, self._db)
+            login_pkt = '%s%s\x00' % (login_pkt, self._db)
 
         print len(login_pkt)
 
