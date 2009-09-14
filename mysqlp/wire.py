@@ -1,3 +1,6 @@
+"""Wire-format encoding and decoding functions for the MySQL protocol."""
+
+
 def decode_lstr(x):
     """Decode the wire-format length coded string."""
     first = ord(x[0])
@@ -13,3 +16,11 @@ def decode_int(data, length=1):
         result |= ord(data[i]) << (i * 8)
 
     return result, data[length:]
+
+
+def encode_int(number, length=1):
+    """Encode an integer into the wire-format encoding of `length` bytes."""
+    result = ''
+    for i in xrange(length):
+        result += chr((number >> (i * 8)) & 0xff)
+    return result

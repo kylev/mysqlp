@@ -1,7 +1,14 @@
 """Cursor implementation."""
 
-from mysqlp import wire
 from mysqlp import hack
+from mysqlp import util
+from mysqlp import wire
+
+
+EOF_MARK = '\xfe'
+
+# TODO Better decoding strategy from MySQL to python types.
+_decoders = {0: int, 1: int, 2: int, 3: int, 8: long, 0xfe: str, 0xfd: str}
 
 
 class Cursor(object):
@@ -12,6 +19,8 @@ class Cursor(object):
         self._data = None
         self.rowcount = -1
         self.arraysize = 1
+        self._result_fields = None
+        self._result_rows = None
 
     @property
     def description(self):
@@ -25,11 +34,16 @@ class Cursor(object):
 
     def execute(self, stmt, params=None):
         self._conn._cmd_query(stmt)
-        self._data = self._conn._read_reply_header()
+        seq, data = self._conn._read_packet()
+        field_count = ord(data[0])
+
+        # Read the field descriptions
+        self._result_fields = list()
         while True:
             seq, data = self._conn._read_packet()
-            if data[0] == '\xfe':
+            if data[0] == EOF_MARK:
                 break
+            # TODO Decode the field data?
             catalog, rest = wire.decode_lstr(data)
             db, rest = wire.decode_lstr(rest)
             table, rest = wire.decode_lstr(rest)
@@ -42,22 +56,51 @@ class Cursor(object):
             col_type, rest = wire.decode_int(rest)
             flags, rest =  wire.decode_int(rest, 2)
             decimals, rest =  wire.decode_int(rest)
-            print hack.hexify(rest[2:])
+            # print hack.hexify(rest[2:])
+            # Only keeping a subset I actually need to know about
+            # TODO I'll probably need to know more later.
+            self._result_fields.append((col_type, decimals))
+
+        if len(self._result_fields) != field_count:
+            raise util.InternalError("Crap, wrong number of fields")
+
+        # Read the result rows
+        self._result_rows = list()
+        while True:
+            seq, data = self._conn._read_packet()
+            if data[0] == EOF_MARK:
+                break
+            columns = list()
+            while data:
+                col, data = wire.decode_lstr(data)
+                columns.append(col)
+            self._result_rows.append(tuple(columns))
 
     def close(self):
-        pass
+        self._result_rows = None
 
     def executemany(self, stmt, params=None):
         pass
 
+    def _decode_row(self, row):
+        decoded = list()
+        for i in range(len(row)):
+            decoded.append(_decoders[self._result_fields[i][0]](row[i]))
+        return tuple(decoded)
+
     def fetchone(self):
-        pass
+        if not self._result_rows:
+            self._result_rows = None
+            return None
+        return self._decode_row(self._result_rows.pop(0))
 
     def fetchmany(self, size=None):
         pass
 
     def fetchall(self):
-        pass
+        result = [self._decode_row(x) for x in self._result_rows]
+        self._result_rows = None
+        return result
 
     def nextset(self):
         pass

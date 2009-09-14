@@ -4,7 +4,6 @@ adapted to coro.
 :Authors: kylev
 """
 
-import exceptions
 import hashlib
 import logging
 import math
@@ -12,6 +11,7 @@ import socket
 
 from mysqlp import cursors, wire
 from mysqlp import hack
+from mysqlp import util
 
 apilevel = '2.0'
 threadsafety = 1
@@ -48,36 +48,17 @@ DEFAULT_CAPS = CAPS['CLIENT_LONG_PASSWORD'] | CAPS['CLIENT_LONG_FLAG'] \
     | CAPS['CLIENT_PROTOCOL_41'] | CAPS['CLIENT_SECURE_CONNECTION']
 
 
-# PEP 249 required exceptions
-class Error(exceptions.StandardError):
-    pass
-
-class Warning(exceptions.StandardError):
-    pass
-
-class InterfaceError(Error):
-    pass
-
-class DatabaseError(Error):
-    pass
-
-class InternalError(DatabaseError):
-    pass
-
-class OperationalError(DatabaseError):
-    pass
-
-class ProgrammingError(DatabaseError):
-    pass
-
-class IntegrityError(DatabaseError):
-    pass
-
-class DataError(DatabaseError):
-    pass
-
-class NotSupportedError(DatabaseError):
-    pass
+# TODO better done a different way?
+Error = util.Error
+Warning = util.Warning
+InterfaceError = util.InterfaceError
+DatabaseError = util.DatabaseError
+InternalError = util.InternalError
+OperationalError = util.OperationalError
+ProgrammingError = util.ProgrammingError
+IntegrityError = util.IntegrityError
+DataError = util.DataError
+NotSupportedError = util.NotSupportedError
 
 
 # TODO Make this if-coro-ish?
@@ -92,10 +73,7 @@ def _extract_int(data, length=1):
 
 
 def _encode_int(number, length=1):
-    result = ''
-    for i in xrange(length):
-        result += chr((number >> (i * 8)) & 0xff)
-    return result
+    return wire.encode_int(number, length)
 
 
 def _encode_len(length):
