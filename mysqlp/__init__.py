@@ -9,6 +9,7 @@ import hashlib
 import logging
 import math
 import socket
+import time
 
 from mysqlp import cursors, wire
 from mysqlp import hack
@@ -292,24 +293,37 @@ connect = Connection
 
 # TODO Define all the other constants and singletons from PEP 249
 
-class Date(datetime.date):
-    pass
+# Constructors
+def Date(year, month, day):
+    return datetime.date(year, month, day)
 
-class Time(datetime.time):
-    pass
+def Time(hour, minute, second):
+    return datetime.time(hour, minute, second)
 
-class Timestamp(datetime.datetime):
-    pass
+def Timestamp(year, month, day, hour, minute, second):
+    datetime.datetime(year, month, day, hour, minute, second)
 
-DateFromTicks = datetime.date.fromtimestamp
+def DateFromTicks(ticks):
+    return Date(*time.localtime(ticks)[:3])
 
-class TimeFromTicks(datetime.time):
-    def __init__(self, ticks):
-        tt = time.localtime(ticks)
-        super(TimeFromTicks, self).__init__(tt[3], tt[4], tt[5])
+def TimeFromTicks(ticks):
+    return Time(*time.localtime(ticks)[3:6])
 
-TimestampFromTicks = datetime.datetime.fromtimestamp
+def TimestampFromTicks(ticks):
+    return Timestamp(*time.localtime(ticks)[:6])
 
-class Binary(str):
-    pass
+def Binary(value):
+    return str(value)
 
+
+# Type objects
+class _DBAPIType(frozenset):
+    def __eq__(self, other):
+        return other in self
+
+STRING = _DBAPIType((wire.MYSQL_TYPE_ENUM, wire.MYSQL_TYPE_VAR_STRING,
+                     wire.MYSQL_TYPE_STRING))
+BINARY = _DBAPIType()
+NUMBER = _DBAPIType()
+DATETIME = _DBAPIType()
+ROWID = _DBAPIType()

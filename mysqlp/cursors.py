@@ -27,10 +27,12 @@ class Cursor(object):
 
     @property
     def description(self):
-        """7-tuple description of the cursor."""
-        # TODO (name, type_code, display_size, internal_size, precision,
-        # scale, null_ok)
-        return ('name', 'typecode', None, None, None, None, None, None)
+        """Description of the cursor results.  It will be either None (if the last
+        statement didn't return results) or a sequence of 7-tuples containing:
+
+        (name, type_code, display_size, internal_size, precision, scale, null_ok)
+        """
+        return self._result_fields
 
     @property
     def connection(self):
@@ -47,6 +49,7 @@ class Cursor(object):
 
     def execute(self, stmt, params=None):
         _log.debug("execute: '%s'", stmt)
+        self._result_fields = None
         self._conn._cmd_query(stmt)
         seq, data = self._conn._read_packet()
         field_count = ord(data[0])
@@ -75,10 +78,13 @@ class Cursor(object):
             col_type, rest = wire.decode_int(rest)
             flags, rest =  wire.decode_int(rest, 2)
             decimals, rest =  wire.decode_int(rest)
+
             # print hack.hexify(rest[2:])
             # Only keeping a subset I actually need to know about
             # TODO I'll probably need to know more later.
-            self._result_fields.append((col_type, decimals))
+            self._result_fields.append(
+                (name, col_type, length, None, decimals, None, flags & 0x1)
+                )
 
         if len(self._result_fields) != field_count:
             raise util.InternalError("Crap, wrong number of fields")
@@ -104,7 +110,7 @@ class Cursor(object):
     def _decode_row(self, row):
         decoded = list()
         for i in range(len(row)):
-            decoded.append(_decoders[self._result_fields[i][0]](row[i]))
+            decoded.append(_decoders[self._result_fields[i][1]](row[i]))
         return tuple(decoded)
 
     def fetchone(self):
