@@ -23,6 +23,7 @@ class Cursor(object):
         self.arraysize = 1
         self._result_fields = None
         self._result_rows = None
+        self._insert_id = None
 
     @property
     def description(self):
@@ -31,7 +32,17 @@ class Cursor(object):
         # scale, null_ok)
         return ('name', 'typecode', None, None, None, None, None, None)
 
-    def callproc(self, procname, params):
+    @property
+    def connection(self):
+        """Read-only access to the connection object."""
+        return self._conn
+
+    @property
+    def lastrowid(self):
+        """Row ID of the last inserted row, or None."""
+        return self._insert_id
+
+    def callproc(self, procname, params=None):
         raise NotImplementedError("TODO")
 
     def execute(self, stmt, params=None):

@@ -283,6 +283,21 @@ connect = Connection
 class Date(datetime.date):
     pass
 
-
 class Time(datetime.time):
     pass
+
+class Timestamp(datetime.datetime):
+    pass
+
+DateFromTicks = datetime.date.fromtimestamp
+
+class TimeFromTicks(datetime.time):
+    def __init__(self, ticks):
+        tt = time.localtime(ticks)
+        super(TimeFromTicks, self).__init__(tt[3], tt[4], tt[5])
+
+TimestampFromTicks = datetime.datetime.fromtimestamp
+
+class Binary(str):
+    pass
+
