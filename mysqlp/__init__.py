@@ -110,6 +110,18 @@ def _scramble(message, password):
 
 
 class Connection(object):
+    # Expose all the exceptions as connection attributes (PEP 249 optional)
+    Error = util.Error
+    Warning = util.Warning
+    InterfaceError = util.InterfaceError
+    DatabaseError = util.DatabaseError
+    InternalError = util.InternalError
+    OperationalError = util.OperationalError
+    ProgrammingError = util.ProgrammingError
+    IntegrityError = util.IntegrityError
+    DataError = util.DataError
+    NotSupportedError = util.NotSupportedError
+
     def __init__(self, host='localhost', user='', passwd='', db=None, port=3306):
         self._log = logging.getLogger(self.__class__.__name__)
         self._user = user
