@@ -9,4 +9,5 @@ setup(
     author = "Kyle VanderBeek",
     author_email = "kylev@kylev.com",
     description = "A pure-python MySQL client library.",
+    test_suite = 'nose.collector',
 )
