@@ -4,6 +4,7 @@ adapted to coro.
 :Authors: kylev
 """
 
+import datetime
 import hashlib
 import logging
 import math
@@ -175,6 +176,9 @@ class Connection(object):
         return data
 
     def _send_packet(self, data, seq=0):
+        if not self._s:
+            raise Error('Attempt to run a command on a closed connection.')
+
         packet = '%s%s%s' % (_encode_int(len(data), 3), _encode_int(seq),
                              data)
 
@@ -255,10 +259,14 @@ class Connection(object):
         self._s = None
 
     def commit(self):
-        pass
+        self._cmd_query('COMMIT')
+        # TODO Error handling
+        self._read_reply_header()
 
     def rollback(self):
-        pass
+        self._cmd_query('COMMIT')
+        # TODO Error handling
+        self._read_reply_header()
 
     def cursor(self):
         return cursors.Cursor(self)
@@ -271,3 +279,10 @@ class Connection(object):
 connect = Connection
 
 # TODO Define all the other constants and singletons from PEP 249
+
+class Date(datetime.date):
+    pass
+
+
+class Time(datetime.time):
+    pass
