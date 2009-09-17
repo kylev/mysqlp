@@ -50,12 +50,20 @@ class Cursor(object):
     def execute(self, stmt, params=None):
         _log.debug("execute: '%s'", stmt)
         self._result_fields = None
-        self._conn._cmd_query(stmt)
+        # TODO Actual escaping !
+        if params:
+            esc_ed = ["'%s'" % (x.replace('\'', '\\\''),) for x in params]
+            self._conn._cmd_query(stmt % tuple(esc_ed))
+        else:
+            self._conn._cmd_query(stmt)
         seq, data = self._conn._read_packet()
-        field_count = ord(data[0])
+        field_count, data = wire.decode_int(data)
 
         if field_count == 0xff:
-            raise util.OperationalError()
+            errno, rest = wire.decode_int(data, 2)
+            sql_state = rest[:5]
+            message = rest[5:]
+            raise util.OperationalError(message, errno)
         if field_count == 0:
             return
 
@@ -104,8 +112,10 @@ class Cursor(object):
     def close(self):
         self._result_rows = None
 
-    def executemany(self, stmt, params=None):
-        raise NotImplementedError("TODO")
+    def executemany(self, stmt, param_seq=None):
+        # TODO more efficient
+        for params in param_seq:
+            self.execute(stmt, params)
 
     def _decode_row(self, row):
         decoded = list()
@@ -115,26 +125,34 @@ class Cursor(object):
 
     def fetchone(self):
         if not self._result_rows:
-            self._result_rows = None
             return None
         return self._decode_row(self._result_rows.pop(0))
 
     def fetchmany(self, size=None):
-        raise NotImplementedError("TODO")
+        if size is None:
+            size = self.arraysize
+        result = self._result_rows[:size]
+        del self._result_rows[:size]
+        return result
 
     def fetchall(self):
+        if self._result_rows is None:
+            raise util.ProgrammingError()
+        if not self._result_rows:
+            return None
         result = [self._decode_row(x) for x in self._result_rows]
-        self._result_rows = None
         return result
 
     def nextset(self):
         raise NotImplementedError("TODO")
 
     def setinputsizes(self, sizes):
-        raise NotImplementedError("TODO")
+        """Does not apply to MySQL."""
+        pass
 
     def setoutputsize(self, size, column=None):
-        raise NotImplementedError("TODO")
+        """Does not apply to MySQL."""
+        pass
 
     def __del__(self):
         self.close()

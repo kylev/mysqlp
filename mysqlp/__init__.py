@@ -184,8 +184,8 @@ class Connection(object):
             raise InterfaceError('%d - %s' % (errnum, errmsg))
         elif code == 254:
             raise InterfaceError('Unknown header <%s>' % (repr(data),))
-        else:
-            print code
+
+        # TODO Should probably make a decision with that code code
         return data
 
     def _send_packet(self, data, seq=0):
