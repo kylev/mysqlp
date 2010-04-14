@@ -49,7 +49,7 @@ def decode_int(data, length=1):
 
 def encode_int(number, length=1):
     """Encode an integer into the wire-format encoding of `length` bytes."""
-    result = ''
+    result = list()
     for i in xrange(length):
-        result += chr((number >> (i * 8)) & 0xff)
-    return result
+        result.append(chr((number >> (i * 8)) & 0xff))
+    return ''.join(result)

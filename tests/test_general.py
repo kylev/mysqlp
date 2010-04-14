@@ -34,5 +34,19 @@ class BinEncoding(unittest.TestCase):
         self.assertEqual(mysqlp._len_bin(None), '\xfb')
 
 
+class Logins(unittest.TestCase):
+    def test_password(self):
+        """Basic login."""
+        c = mysqlp.connect('testuser1', 'pass1', database='mysqlp_test');
+        c.close()
+
+    def test_password323(self):
+        """Old style password hashing."""
+        c = mysqlp.connect('testuser2', 'pass2', database='mysqlp_test');
+        c.close()
+
+
 if __name__ == '__main__':
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
     unittest.main()

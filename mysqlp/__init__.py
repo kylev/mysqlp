@@ -11,14 +11,15 @@ import math
 import socket
 import time
 
-from mysqlp import cursors, wire
+from mysqlp import cursors
 from mysqlp import hack
 from mysqlp import util
+from mysqlp import wire
+
 
 apilevel = '2.0'
 threadsafety = 1
 paramstyle = 'format'
-
 
 DEFAULT_RECV_SIZE = 0x8000
 MYSQL_HEADER_SIZE = 0x4
@@ -92,6 +93,52 @@ def _len_bin(data):
         return chr(251)
     return _encode_len(len(data)) + data
 
+class _random_state:
+
+    def __init__(self, seed, seed2):
+        self.max_value = 0x3FFFFFFF
+        self.seed = seed % self.max_value
+        self.seed2 = seed2 % self.max_value
+        return None
+
+    def rnd(self):
+        self.seed = (self.seed * 3 + self.seed2) % self.max_value
+        self.seed2 = (self.seed + self.seed2 + 33) % self.max_value
+        return float(self.seed) / float(self.max_value)
+
+
+def _hash_password_323(password):
+    nr = 1345345333L
+    nr2 = 0x12345671L
+    add = 7
+
+    for ch in password:
+        if (ch == ' ') or (ch == '\t'):
+            continue
+        tmp = ord(ch)
+        nr = nr ^ (((nr & 63) + add) * tmp) + (nr << 8)
+        nr2 = nr2 + ((nr2 << 8) ^ nr)
+        add = add + tmp
+
+    return (nr & ((1L<<31)-1L), nr2 & ((1L<<31)-1L))
+
+
+def _scramble_323(message, password):
+    hash_pass = _hash_password_323(password)
+    hash_mess = _hash_password_323(message)
+
+    r = _random_state(hash_pass[0] ^ hash_mess[0], hash_pass[1] ^ hash_mess[1])
+    to = []
+
+    for ch in message:
+        to.append (int (math.floor ((r.rnd() * 31) + 64)))
+
+    extra = int (math.floor (r.rnd()*31))
+    for i in range(len(to)):
+        to[i] = to[i] ^ extra
+
+    return ''.join([chr(x) for x in to])
+
 
 def _scramble(message, password):
     # Double SHA1 the password
@@ -123,11 +170,12 @@ class Connection(object):
     DataError = util.DataError
     NotSupportedError = util.NotSupportedError
 
-    def __init__(self, host='localhost', user='', passwd='', db=None, port=3306):
+    def __init__(self, user='', password='', host='localhost', database=None, port=3306):
         self._log = logging.getLogger(self.__class__.__name__)
         self._user = user
-        self._password = passwd
-        self._db = db
+        self._password = password
+        self._host = host
+        self._db = database
         self._port = port
 
         self._s = _make_socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -176,23 +224,25 @@ class Connection(object):
         return seq, data
 
     def _read_reply_header(self):
-        seq, data = self._read_packet()
+        self._seq, data = self._read_packet()
 
         code, data = _extract_int(data)
         if code == 255:
-            errnum, errmsg = _extract_int(data, 2)
-            raise InterfaceError('%d - %s' % (errnum, errmsg))
-        elif code == 254:
-            raise InterfaceError('Unknown header <%s>' % (repr(data),))
-
-        # TODO Should probably make a decision with that code code
-        return data
+            errnum, rest = _extract_int(data, 2)
+            sqlstate = rest[1:5]
+            errmsg = rest[6:]
+            raise InterfaceError('%d (%s) - %s' % (errnum, sqlstate, errmsg))
+        return code, data
 
     def _send_packet(self, data, seq=0):
         if not self._s:
             raise Error('Attempt to run a command on a closed connection.')
 
-        packet = '%s%s%s' % (_encode_int(len(data), 3), _encode_int(seq),
+        if seq > 0:
+            self._seq = seq
+        else:
+            self._seq += 1
+        packet = '%s%s%s' % (_encode_int(len(data), 3), _encode_int(self._seq),
                              data)
 
         self._log.debug("Sending packet %s", hack.hexify(packet))
@@ -245,8 +295,10 @@ class Connection(object):
             capabilities |= CAPS['CLIENT_CONNECT_WITH_DB']
 
         # TODO Make better decisions about extended capabilities
-        login_pkt = "%s%s%s%s%s\x00" % (_encode_int(capabilities & 0xffff, 2),
-                                        _encode_int(capabilities >> 16, 2),
+        #login_pkt = "%s%s%s%s%s\x00" % (_encode_int(capabilities & 0xffff, 2),
+        #                                _encode_int(capabilities >> 16, 2),
+        login_pkt = "%s%s%s%s%s\x00" % (_encode_int(0x8da6, 2),
+                                        _encode_int(3, 2),
                                         "\x00\x00\x00\x01\x08",
                                         "\x00" * 23,
                                         self._user,
@@ -263,10 +315,15 @@ class Connection(object):
 
         # Login packet always has seqence 1 for some reason
         self._send_packet(login_pkt, 1)
-        self._read_reply_header()
+        code, data = self._read_reply_header()
+
+        if code == 0xfe:
+            self._log.debug("Fallback encoding requested.")
+            self._send_packet(_scramble_323(self._salt, self._password)[:8] + '\x00')
+            print "BLAH %s" % (self._read_reply_header(),)
 
     def close(self):
-        self._send_packet('\x00')
+        self._send_packet('\x01')
         # No response
         self._s.close()
         self._s = None

@@ -6,7 +6,7 @@ import mysqlp
 
 class MySQLpTest(dbapi20.DatabaseAPI20Test):
     driver = mysqlp
-    connect_kw_args = dict(user='kylev', db='test')
+    connect_kw_args = dict(user='kylev', database='test')
 
     def test_setoutputsize(self):
         """Skipped."""
@@ -15,6 +15,7 @@ class MySQLpTest(dbapi20.DatabaseAPI20Test):
     def test_nextset(self):
         """Skipped."""
         pass
+
 
 if __name__ == '__main__':
     import logging, unittest
