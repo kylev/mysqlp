@@ -93,7 +93,9 @@ def _len_bin(data):
         return chr(251)
     return _encode_len(len(data)) + data
 
-class _random_state:
+
+class _RandomState:
+    """Pseudo-random number generator for old-style passwords (from password.c)."""
 
     def __init__(self, seed, seed2):
         self.max_value = 0x3FFFFFFF
@@ -116,26 +118,26 @@ def _hash_password_323(password):
         if (ch == ' ') or (ch == '\t'):
             continue
         tmp = ord(ch)
-        nr = nr ^ (((nr & 63) + add) * tmp) + (nr << 8)
-        nr2 = nr2 + ((nr2 << 8) ^ nr)
-        add = add + tmp
+        nr ^= (((nr & 63) + add) * tmp) + (nr << 8)
+        nr2 += ((nr2 << 8) ^ nr)
+        add += tmp
 
-    return (nr & ((1L<<31)-1L), nr2 & ((1L<<31)-1L))
+    return (nr & ((1L << 31) - 1L), nr2 & ((1L << 31) - 1L))
 
 
 def _scramble_323(message, password):
     hash_pass = _hash_password_323(password)
     hash_mess = _hash_password_323(message)
 
-    r = _random_state(hash_pass[0] ^ hash_mess[0], hash_pass[1] ^ hash_mess[1])
+    r = _RandomState(hash_pass[0] ^ hash_mess[0], hash_pass[1] ^ hash_mess[1])
     to = []
 
     for ch in message:
-        to.append (int (math.floor ((r.rnd() * 31) + 64)))
+        to.append(int(math.floor((r.rnd() * 31) + 64)))
 
-    extra = int (math.floor (r.rnd()*31))
+    extra = int(math.floor(r.rnd() * 31))
     for i in range(len(to)):
-        to[i] = to[i] ^ extra
+        to[i] ^= extra
 
     return ''.join([chr(x) for x in to])
 
