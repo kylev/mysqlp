@@ -35,6 +35,24 @@ class BinEncoding(unittest.TestCase):
 
 
 class Logins(unittest.TestCase):
+    def test_scramble(self):
+        """New style password scramble."""
+        password = 'spam'
+        seed =  '\x3b\x55\x78\x7d\x2c\x5f\x7c\x72\x49\x52' \
+                '\x3f\x28\x47\x6f\x77\x28\x5f\x28\x46\x69'
+        hashed = '\x3a\x07\x66\xba\xba\x01\xce\xbe\x55\xe6' \
+                 '\x29\x88\xaa\xae\xdb\x00\xb3\x4d\x91\x5b'
+
+        self.assertEqual(hashed, mysqlp._scramble(seed, password))
+
+    def test_scramble_323(self):
+        """Old style password scramble."""
+        password = 'pass2'
+        seed = '\x5a\x3f\x6a\x78\x3c\x62\x5b\x7e'
+        hashed = '\x5a\x5d\x4c\x5d\x4e\x43\x42\x4f'
+
+        self.assertEqual(hashed, mysqlp._scramble_323(seed, password))
+
     def test_password(self):
         """Basic login."""
         c = mysqlp.connect('testuser1', 'pass1', database='mysqlp_test');

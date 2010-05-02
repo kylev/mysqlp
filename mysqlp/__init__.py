@@ -49,7 +49,7 @@ CAPS = dict(CLIENT_LONG_PASSWORD=1,
 DEFAULT_CAPS = CAPS['CLIENT_LONG_PASSWORD'] | CAPS['CLIENT_LONG_FLAG'] \
     | CAPS['CLIENT_SECURE_CONNECTION'] | CAPS['CLIENT_TRANSACTIONS'] \
     | CAPS['CLIENT_PROTOCOL_41'] | CAPS['CLIENT_SECURE_CONNECTION']
-
+# Eventually: client_flag |= CAPS['CLIENT_MULTI_STATEMENTS'] | CAPS['CLIENT_MULTI_RESULTS']
 
 # TODO better done a different way?
 Error = util.Error
@@ -146,17 +146,12 @@ def _scramble(message, password):
     # Double SHA1 the password
     stage_one = hashlib.sha1(password).digest()
     stage_two = hashlib.sha1(stage_one).digest()
-
     # Combine the two
-    crypt_string = hashlib.sha1(message)
-    crypt_string.update(stage_two)
-    to = crypt_string.digest()
+    to = hashlib.sha1(message + stage_two).digest()
 
     # XOR together
-    result = ''.join([chr(ord(to[x]) ^ ord(stage_two[x]))
-                      for x in xrange(len(to))])
-
-    return result
+    xored = [chr(ord(a) ^ ord(b)) for a, b in zip(stage_one, to)]
+    return ''.join(xored)
 
 
 class Connection(object):
@@ -273,8 +268,9 @@ class Connection(object):
         # Two bytes of status
         self._status, rest = _extract_int(rest, 2)
 
-        # Empty 13 bytes, then 13 more bytes of the salt
-        self._salt += rest[13:]
+        # Empty 13 bytes, then 12 more bytes of the salt
+        rest = rest[13:]
+        self._salt += rest[:12]
 
         if self._log.isEnabledFor(logging.DEBUG):
             self._log.debug("Protocol v%d, version %s, thread %d, "
@@ -292,19 +288,24 @@ class Connection(object):
         self._log.debug("Greeting %s", repr(greeting))
         self._decode_greeting(greeting)
 
-        capabilities = DEFAULT_CAPS
-        if self._db:
-            capabilities |= CAPS['CLIENT_CONNECT_WITH_DB']
+        client_flag = DEFAULT_CAPS
 
-        # TODO Make better decisions about extended capabilities
-        #login_pkt = "%s%s%s%s%s\x00" % (_encode_int(capabilities & 0xffff, 2),
-        #                                _encode_int(capabilities >> 16, 2),
-        login_pkt = "%s%s%s%s%s\x00" % (_encode_int(0x8da6, 2),
-                                        _encode_int(3, 2),
-                                        "\x00\x00\x00\x01\x08",
-                                        "\x00" * 23,
-                                        self._user,
-                                        )
+        if self._db:
+            client_flag |= CAPS['CLIENT_CONNECT_WITH_DB']
+
+        # Clear abilities the server doesn't have.
+        client_flag = ((client_flag &
+                        ~(CAPS['CLIENT_COMPRESS'] | CAPS['CLIENT_SSL'] | CAPS['CLIENT_PROTOCOL_41'])) |
+                       (client_flag & self._capabilities))
+
+        login_pkt = _encode_int(client_flag, 2)
+        if client_flag & CAPS['CLIENT_PROTOCOL_41']:
+            # Long flag
+            login_pkt += _encode_int(client_flag >> 16, 2)
+        login_pkt += "%s%s%s\x00" % ("\x00\x00\x00\x01\x08",
+                                     "\x00" * 23,
+                                     self._user,
+                                     )
 
         if self._password:
             enc_password = _scramble(self._salt, self._password)
@@ -321,8 +322,8 @@ class Connection(object):
 
         if code == 0xfe:
             self._log.debug("Fallback encoding requested.")
-            self._send_packet(_scramble_323(self._salt, self._password)[:8] + '\x00')
-            print "BLAH %s" % (self._read_reply_header(),)
+            self._send_packet(_scramble_323(self._salt[:8], self._password)[:8] + '\x00')
+            code, data = self._read_reply_header()
 
     def close(self):
         self._send_packet('\x01')
