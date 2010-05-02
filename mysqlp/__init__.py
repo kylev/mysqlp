@@ -337,7 +337,7 @@ class Connection(object):
         self._read_reply_header()
 
     def rollback(self):
-        self._cmd_query('COMMIT')
+        self._cmd_query('ROLLBACK')
         # TODO Error handling
         self._read_reply_header()
 
