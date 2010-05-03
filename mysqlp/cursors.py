@@ -9,8 +9,14 @@ from mysqlp import wire
 
 EOF_MARK = '\xfe'
 
+def _str_or_null(x):
+    if x is None:
+        return None
+    return str(x)
+
+
 # TODO Better decoding strategy from MySQL to python types.
-_decoders = {0: int, 1: int, 2: int, 3: int, 8: long, 0xfe: str, 0xfd: str}
+_decoders = {0: int, 1: int, 2: int, 3: int, 8: long, 0xfe: _str_or_null, 0xfd: _str_or_null}
 _log = logging.getLogger(__name__)
 
 class Cursor(object):

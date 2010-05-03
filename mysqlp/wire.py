@@ -33,9 +33,11 @@ MYSQL_TYPE_GEOMETRY = 255
 def decode_lstr(x):
     """Decode the wire-format length coded string."""
     first = ord(x[0])
-    if first == 0:
+    if first <= 250:
+        return x[1:first + 1], x[first + 1:]
+    elif first == 251:
         return None, x[1:]
-    return x[1:first + 1], x[first + 1:]
+    raise NotImplementedError("Long field decoding TODO")
 
 
 def decode_int(data, length=1):
