@@ -19,5 +19,5 @@ class MySQLpTest(dbapi20.DatabaseAPI20Test):
 
 if __name__ == '__main__':
     import logging, unittest
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.WARNING)
     unittest.main()

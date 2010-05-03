@@ -59,8 +59,18 @@ class Logins(unittest.TestCase):
         c.close()
 
     def test_password323(self):
-        """Old style password hashing."""
+        """Old style password login."""
         c = mysqlp.connect('testuser2', 'pass2', database='mysqlp_test');
+        c.close()
+
+    def test_simple_query(self):
+        c = mysqlp.connect('testuser1', 'pass1', database='mysqlp_test');
+        cur = c.cursor()
+        cur.execute('BEGIN')
+        cur.execute('SELECT 1')
+        cur.fetchall()
+        c.commit()
+        cur.close()
         c.close()
 
 

@@ -125,7 +125,7 @@ class Cursor(object):
 
     def fetchone(self):
         if not self._result_rows:
-            return None
+            raise util.ProgrammingError("Called with no available results.")
         return self._decode_row(self._result_rows.pop(0))
 
     def fetchmany(self, size=None):
@@ -137,7 +137,7 @@ class Cursor(object):
 
     def fetchall(self):
         if self._result_rows is None:
-            raise util.ProgrammingError()
+            raise util.ProgrammingError("Called with no available results.")
         if not self._result_rows:
             return None
         result = [self._decode_row(x) for x in self._result_rows]

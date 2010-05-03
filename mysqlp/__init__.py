@@ -187,7 +187,7 @@ class Connection(object):
         """Call to get data when we expect it."""
         data = self._s.recv(DEFAULT_RECV_SIZE)
         if not data:
-            raise "TODO exception"
+            raise ProgrammingError("TODO exception")
         else:
             self._recv_buffer += data
             self._recv_length += len(data)
@@ -231,11 +231,11 @@ class Connection(object):
             raise InterfaceError('%d (%s) - %s' % (errnum, sqlstate, errmsg))
         return code, data
 
-    def _send_packet(self, data, seq=0):
+    def _send_packet(self, data, seq=None):
         if not self._s:
             raise Error('Attempt to run a command on a closed connection.')
 
-        if seq > 0:
+        if seq is not None:
             self._seq = seq
         else:
             self._seq += 1
@@ -246,6 +246,7 @@ class Connection(object):
 
         if self._s.sendall(packet) is not None:
             raise InterfaceError("Send failed.")
+        return len(packet)
 
     def _decode_greeting(self, greeting):
         """Extract all the info about the server from the greeting packet."""
@@ -277,7 +278,7 @@ class Connection(object):
                             "charset %d, salt %s, status %d",
                             self._proto, self._version, self._thread_id,
                             self._charset, repr(self._salt), self._status)
-            for k, v in CAPS.iteritems():
+            for k, v in tuple(): #CAPS.iteritems():
                 has_it = 'no'
                 if self._capabilities & v:
                     has_it = 'yes'
@@ -325,6 +326,12 @@ class Connection(object):
             self._send_packet(_scramble_323(self._salt[:8], self._password)[:8] + '\x00')
             code, data = self._read_reply_header()
 
+        if code != 0:
+            raise OperationalError("TODO? Bad login?")
+
+        # TODO Required for the DBAPI
+        #self._cmd_query('SET AUTOCOMMIT = 0')
+
     def close(self):
         self._send_packet('\x01')
         # No response
@@ -345,6 +352,7 @@ class Connection(object):
         return cursors.Cursor(self)
 
     def _cmd_query(self, query):
+        self._seq = -1
         self._send_packet('\x03' + query)
 
 
