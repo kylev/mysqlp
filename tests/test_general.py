@@ -75,6 +75,9 @@ class Logins(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    import logging
-    logging.basicConfig(level=logging.DEBUG)
+    import logging, sys
+    if '-v' in sys.argv:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.WARNING)
     unittest.main()

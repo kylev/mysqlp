@@ -56,6 +56,9 @@ class Cursor(object):
     def execute(self, stmt, params=None):
         _log.debug("execute: '%s'", stmt)
         self._result_fields = None
+        self._result_rows = None
+        self.rowcount = -1
+
         # TODO Actual escaping !
         if params:
             esc_ed = ["'%s'" % (x.replace('\'', '\\\''),) for x in params]
@@ -114,6 +117,7 @@ class Cursor(object):
                 col, data = wire.decode_lstr(data)
                 columns.append(col)
             self._result_rows.append(tuple(columns))
+        self.rowcount = len(self._result_rows)
 
     def close(self):
         self._result_rows = None
@@ -130,24 +134,31 @@ class Cursor(object):
         return tuple(decoded)
 
     def fetchone(self):
-        if not self._result_rows:
+        if self.rowcount == -1:
             raise util.ProgrammingError("Called with no available results.")
+        if self.rowcount == 0:
+            return None
+        if not self._result_rows:
+            return None
+
         return self._decode_row(self._result_rows.pop(0))
 
     def fetchmany(self, size=None):
-        if size is None:
+        if self.rowcount == -1:
+            raise util.ProgrammingError("Called with no available results.")
+        if self.rowcount == 0 or not self._result_rows:
+            return list()
+
+        if size == -1:
+            size = len(self._result_rows)
+        elif size is None:
             size = self.arraysize
-        result = self._result_rows[:size]
+        result = [self._decode_row(x) for x in self._result_rows[:size]]
         del self._result_rows[:size]
-        return result
+        return result or list()
 
     def fetchall(self):
-        if self._result_rows is None:
-            raise util.ProgrammingError("Called with no available results.")
-        if not self._result_rows:
-            return None
-        result = [self._decode_row(x) for x in self._result_rows]
-        return result
+        return self.fetchmany(-1)
 
     def nextset(self):
         raise NotImplementedError("TODO")
