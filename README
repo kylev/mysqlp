@@ -1,0 +1,17 @@
+This is an experimental pure Python driver for access to the
+open-source MySQL RDBMS.  Its aim is to follow the Python DBAPI 2.0
+(PEP 249) and provide a robust environment in situations where the
+native driver (MySQLdb) is difficult to use.  This may include such
+environments esoteric as PyPy, Jython, Twisted or other environments
+where compiling the native MySQL libraries is problematic (such as a
+Windows or OSX machine lacking sufficient development tools).
+
+!!! IMPORTANT !!!
+
+This driver is in a embryonic state, incomplete, and utterly
+unreliable.  There is no telling what it may do to you or your data.
+You may lose rows, tables, databases, or entire computers.  It may
+impregnate your dog.  It might steal Christmas.  It could ruin
+lasange.
+
+Do not use this driver.
